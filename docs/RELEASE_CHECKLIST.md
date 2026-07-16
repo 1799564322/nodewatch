@@ -17,7 +17,7 @@
 - [ ] 后端 pytest 通过
 - [ ] Agent Ruff 和 pytest 通过
 - [ ] 前端 typecheck、Vitest 和 production build 通过
-- [ ] GitHub Actions `CI` 全部绿色
+- [x] GitHub Actions `CI` 全部绿色
 - [ ] GitHub Actions 能生成 Windows/Linux Agent Artifact 与 SHA-256
 
 ## 功能验收
@@ -63,7 +63,8 @@
 
 ## 发布
 
-- [ ] 仓库公开前最后一次人工秘密检查完成
+- [x] 仓库公开前最后一次人工秘密检查完成
+- [x] GitHub 仓库已设为 Public，README 与脱敏截图可公开访问
 - [ ] 更新日志只描述真实完成内容
 - [ ] 创建并推送带说明的 `v1.0.0` tag
 - [ ] 发布镜像工作流绿色
