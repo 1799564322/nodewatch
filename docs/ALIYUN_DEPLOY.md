@@ -244,6 +244,8 @@ curl -fsS https://<DOMAIN>/api/v1/health/ready
 
 确认 HTTP 自动跳转 HTTPS、证书匹配、Cookie 仅通过 HTTPS 发送。
 
+如果暂时没有域名，将公网 IP/HTTP 视为未完成状态：只做页面与健康检查，不创建 Agent Token，不配置公网 Agent，并在取得域名、完成 ICP 备案和 HTTPS 后再次轮换管理员密码。
+
 ## 10. Agent 公网上报
 
 HTTPS 完成后在网页创建设备，以 `https://<DOMAIN>` 配置 Agent，前台观察 3～5 个采样周期，再安装为 Windows 计划任务或 Linux systemd。公开截图不得包含完整 Token、真实公网 IP或敏感主机名。
@@ -256,10 +258,10 @@ cd /opt/nodewatch/deploy
 ./scripts/restore-test.sh /opt/nodewatch/backups/nodewatch-时间.sql.gz
 ```
 
-恢复脚本只创建独立临时数据库，结束后自动删除，不覆盖生产库。每日备份可加入 root cron：
+恢复脚本只创建独立临时数据库，结束后自动删除，不覆盖生产库。每日备份加入 `deploy` 用户 crontab，避免生成 root 所有的备份文件：
 
 ```text
-15 3 * * * /opt/nodewatch/deploy/scripts/backup.sh >> /var/log/nodewatch-backup.log 2>&1
+15 3 * * * /opt/nodewatch/deploy/scripts/backup.sh >> /opt/nodewatch/backups/backup.log 2>&1
 ```
 
 服务器只保留最近 7 天备份，并定期复制到服务器外的私有位置。同盘备份不能防止整盘损坏。
