@@ -1,0 +1,12 @@
+server_url = "http://127.0.0.1:8000"
+agent_token = "nwa_请替换为网页中一次性显示的Token"
+collect_interval_seconds = 60
+request_timeout_seconds = 10
+verify_tls = true
+log_level = "INFO"
+cache_max_samples = 10000
+cache_retention_days = 7
+max_batch_samples = 500
+retry_max_seconds = 300
+log_max_bytes = 5242880
+log_backup_count = 3

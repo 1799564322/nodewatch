@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: nodewatch
+          POSTGRES_PASSWORD: nodewatch
+          POSTGRES_DB: nodewatch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nodewatch -d nodewatch_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://nodewatch:nodewatch@localhost:5432/nodewatch_test
+      SECRET_KEY: ci-only-secret-key-at-least-32-characters
+      BOOTSTRAP_ADMIN_USERNAME: admin
+      BOOTSTRAP_ADMIN_PASSWORD: ci-only-bootstrap-password
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: alembic upgrade head
+      - run: pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+  agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest
+
+  agent-package:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: nodewatch-agent-linux-x86_64
+            executable: nodewatch-agent
+          - os: windows-latest
+            artifact: nodewatch-agent-windows-x86_64
+            executable: nodewatch-agent.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m PyInstaller --clean --noconfirm nodewatch-agent.spec
+      - name: 整理发布文件并生成校验值
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item "dist/${{ matrix.executable }}" "release/${{ matrix.executable }}"
+          Copy-Item config.example.toml release/config.example.toml
+          Copy-Item install/* release/
+          $hash = (Get-FileHash "release/${{ matrix.executable }}" -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ matrix.executable }}" | Set-Content "release/${{ matrix.executable }}.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: agent/release/

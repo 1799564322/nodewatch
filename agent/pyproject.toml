@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nodewatch-agent"
+version = "0.1.0"
+description = "NodeWatch 跨平台主机采集 Agent"
+requires-python = ">=3.12"
+dependencies = ["httpx>=0.28,<1.0", "psutil>=6.1,<8.0"]
+
+[project.scripts]
+nodewatch-agent = "nodewatch_agent.main:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3,<9.0", "ruff>=0.11,<1.0", "pyinstaller>=6.12,<7.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["nodewatch_agent"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
