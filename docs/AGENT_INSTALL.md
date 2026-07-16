@@ -33,11 +33,13 @@ sha256sum -c nodewatch-agent.sha256
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .\windows-install.ps1 `
   -BinaryPath ".\nodewatch-agent.exe" `
-  -ServerUrl "https://你的域名" `
+  -ServerUrl "https://你的公网IP" `
   -AgentToken "nwa_替换为真实Token"
 ```
 
 脚本会把文件安装到 `C:\ProgramData\NodeWatch`，创建名为 `NodeWatch Agent` 的开机计划任务并立即启动。
+
+重复运行安装脚本可以覆盖升级：脚本会停止并注销旧计划任务，结束仍占用程序文件的旧 Agent 进程，再替换可执行文件和重建任务。`state` 中的身份与离线缓存会保留，连接恢复后继续补传。
 
 检查运行状态和日志：
 
@@ -52,7 +54,7 @@ Get-Content "C:\ProgramData\NodeWatch\logs\agent.log" -Encoding utf8 -Tail 30
 
 ```bash
 chmod +x linux-install.sh linux-uninstall.sh nodewatch-agent
-sudo ./linux-install.sh ./nodewatch-agent "https://你的域名" "nwa_替换为真实Token"
+sudo ./linux-install.sh ./nodewatch-agent "https://你的公网IP" "nwa_替换为真实Token"
 ```
 
 检查服务和日志：
@@ -87,7 +89,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 ## 6. 常见错误
 
 - `HTTP 401/403/409`：Token 无效、失效或绑定了其他 Agent。Agent 会等待 300 秒再请求，不会每秒刷服务端。
-- TLS 校验失败：生产环境应修复域名证书。只有本地调试时才能把 `verify_tls` 改为 `false`。
+- TLS 校验失败：生产环境应修复公网 IP 证书。只有本地调试时才能把 `verify_tls` 改为 `false`。
 - Windows 任务未运行：确认安装时使用了管理员 PowerShell，并查看 `logs/agent.log`。
 - Linux 启动失败：执行 `journalctl -u nodewatch-agent -n 100 --no-pager` 查看原因。
 

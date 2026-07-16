@@ -1,6 +1,6 @@
 # 阿里云轻量应用服务器部署
 
-本指南面向 Ubuntu 24.04、2 vCPU、2 GiB 内存的阿里云轻量应用服务器。仓库和截图中始终用 `<PUBLIC_IP>`、`<DOMAIN>`、`<GITHUB_USERNAME>` 占位，不保存公网 IP、SSH 私钥或生产凭据。
+本指南面向 Ubuntu 24.04、2 vCPU、2 GiB 内存的阿里云轻量应用服务器。NodeWatch 当前不配置域名，使用受信任的公网 IP HTTPS 证书。仓库和截图中始终用 `<PUBLIC_IP>`、`<GITHUB_USERNAME>` 占位，不保存公网 IP、SSH 私钥或生产凭据。
 
 生产链路：公网 `80/443` → 宿主机 Nginx → `127.0.0.1:8000` → 单 Worker App 容器 → Docker 内部 PostgreSQL。数据库不映射宿主机端口。
 
@@ -42,7 +42,7 @@ uname -m
 ```bash
 apt update
 apt full-upgrade -y
-apt install -y ca-certificates curl gnupg git nginx certbot python3-certbot-nginx jq vim
+apt install -y ca-certificates curl gnupg git nginx jq vim snapd
 systemctl enable --now nginx
 
 adduser deploy
@@ -142,7 +142,7 @@ Token 不写入 shell 历史、文件或截图。
 
 ## 6. 创建生产目录和 `.env`
 
-把 `deploy/docker-compose.production.yml` 复制为服务器 `/opt/nodewatch/deploy/docker-compose.yml`，同时复制 `production.env.example`、Nginx 模板和 `deploy/scripts/`。
+把 `deploy/docker-compose.production.yml` 复制为服务器 `/opt/nodewatch/deploy/docker-compose.yml`，同时复制 `production.env.example`、两个 Nginx 模板和 `deploy/scripts/`。
 
 ```bash
 sudo mkdir -p /opt/nodewatch/deploy/scripts /opt/nodewatch/backups
@@ -161,13 +161,13 @@ python3 -c "import secrets; print(secrets.token_urlsafe(64))"
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-分别写入 `SECRET_KEY` 和 `POSTGRES_PASSWORD`。首次通过 IP 验证时设置：
+分别写入 `SECRET_KEY` 和 `POSTGRES_PASSWORD`。生产环境设置：
 
 ```dotenv
 NODEWATCH_IMAGE=ghcr.io/<GITHUB_USERNAME>/nodewatch:v0.1.1
 POSTGRES_IMAGE=ghcr.io/<GITHUB_USERNAME>/nodewatch-postgres:17-alpine-v0.1.1
 ALLOWED_HOSTS=<PUBLIC_IP>
-SESSION_COOKIE_SECURE=false
+SESSION_COOKIE_SECURE=true
 ```
 
 不要提交服务器 `.env`。发布工作流会把官方 `postgres:17-alpine` 同步为与发布标签绑定的 GHCR 镜像，避免中国内地服务器因 Docker Hub 超时无法部署；不要改用来源不明的镜像站。
@@ -199,56 +199,82 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-短时访问 `http://<PUBLIC_IP>/` 和健康接口确认链路。HTTP 会明文传输 Cookie/Token，不要长期运行正式 Agent。
+先创建证书验证文件并从另一台电脑访问，确认公网 80 端口返回文件原文。HTTP 只用于 ACME 验证和跳转，不在此阶段登录或传输 Token：
 
-首次登录后，在服务器交互式修改管理员密码：
+```bash
+sudo mkdir -p /var/www/certbot/.well-known/acme-challenge
+echo nodewatch-ip-certificate-test | \
+  sudo tee /var/www/certbot/.well-known/acme-challenge/test
+curl -fsS http://<PUBLIC_IP>/.well-known/acme-challenge/test
+```
+
+## 9. 公网 IP HTTPS
+
+公网 IP 证书要求 Certbot 5.4 或更高版本。Ubuntu APT 中的旧版 Certbot 不支持该功能，因此使用官方 Snap 包：
+
+```bash
+sudo apt remove -y certbot python3-certbot python3-certbot-nginx
+sudo snap install --classic certbot
+sudo ln -sf /snap/bin/certbot /usr/local/bin/certbot
+certbot --version
+```
+
+申请证书时按提示填写自己的邮箱并同意服务条款：
+
+```bash
+sudo certbot certonly \
+  --webroot \
+  --webroot-path /var/www/certbot \
+  --preferred-profile shortlived \
+  --ip-address <PUBLIC_IP> \
+  --cert-name nodewatch-ip
+```
+
+公网 IP 证书有效期约 6 天，必须依赖自动续期。证书成功签发后切换为最终 Nginx 配置：
+
+```bash
+sudo cp nginx-nodewatch-ip-https.conf.example /etc/nginx/sites-available/nodewatch
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+配置续期后自动重载 Nginx：
+
+```bash
+sudo install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy
+printf '%s\n' \
+  '#!/bin/sh' \
+  '/usr/sbin/nginx -t >/dev/null 2>&1 && /usr/bin/systemctl reload nginx' | \
+  sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh >/dev/null
+sudo chmod 755 /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+sudo certbot renew --dry-run --run-deploy-hooks
+systemctl list-timers --all | grep certbot
+```
+
+重建 App 并验证：
+
+```bash
+cd /opt/nodewatch/deploy
+sed -i 's/^SESSION_COOKIE_SECURE=.*/SESSION_COOKIE_SECURE=true/' .env
+docker compose up -d --force-recreate --wait --wait-timeout 180 app
+curl -I http://<PUBLIC_IP>/
+curl -fsS https://<PUBLIC_IP>/api/v1/health/ready
+```
+
+确认 HTTP 自动跳转 HTTPS、浏览器信任 IP 证书、Cookie 仅通过 HTTPS 发送，并且模拟续期成功。域名与 ICP 备案不属于当前项目交付范围；将来若改用中国内地域名，应另行核对并完成当时适用的备案要求。
+
+HTTPS 验收后首次登录，在服务器交互式修改管理员密码，随后删除 bootstrap 配置并重建 App：
 
 ```bash
 cd /opt/nodewatch/deploy
 docker compose exec app python -m app.cli change-password admin
-```
-
-随后删除 `.env` 中两行 bootstrap 配置，并重建 App：
-
-```bash
 sed -i '/^BOOTSTRAP_ADMIN_USERNAME=/d;/^BOOTSTRAP_ADMIN_PASSWORD=/d' .env
-docker compose up -d --force-recreate app
+docker compose up -d --force-recreate --wait --wait-timeout 180 app
 ```
-
-重新登录确认新密码有效。
-
-## 9. 域名、备案与 HTTPS
-
-中国内地服务器使用域名正式提供 Web 服务前，需要完成 ICP 备案。备案通过后将 `<DOMAIN>` 的 A 记录指向公网 IP，把 Nginx `server_name` 改为域名：
-
-```bash
-getent hosts <DOMAIN>
-sudo nginx -t
-sudo systemctl reload nginx
-sudo certbot --nginx -d <DOMAIN>
-sudo certbot renew --dry-run
-```
-
-修改 `.env`：
-
-```dotenv
-ALLOWED_HOSTS=<DOMAIN>
-SESSION_COOKIE_SECURE=true
-```
-
-```bash
-docker compose up -d --force-recreate app
-curl -I https://<DOMAIN>/
-curl -fsS https://<DOMAIN>/api/v1/health/ready
-```
-
-确认 HTTP 自动跳转 HTTPS、证书匹配、Cookie 仅通过 HTTPS 发送。
-
-如果暂时没有域名，将公网 IP/HTTP 视为未完成状态：只做页面与健康检查，不创建 Agent Token，不配置公网 Agent，并在取得域名、完成 ICP 备案和 HTTPS 后再次轮换管理员密码。
 
 ## 10. Agent 公网上报
 
-HTTPS 完成后在网页创建设备，以 `https://<DOMAIN>` 配置 Agent，前台观察 3～5 个采样周期，再安装为 Windows 计划任务或 Linux systemd。公开截图不得包含完整 Token、真实公网 IP或敏感主机名。
+HTTPS 完成后在网页创建设备，以 `https://<PUBLIC_IP>` 配置 Agent，前台观察 3～5 个采样周期，再安装为 Windows 计划任务或 Linux systemd。公开截图不得包含完整 Token、真实公网 IP 或敏感主机名。
 
 ## 11. 备份与恢复演练
 
@@ -272,7 +298,7 @@ cd /opt/nodewatch/deploy
 
 ```bash
 ./scripts/deploy.sh
-./scripts/smoke-test.sh https://<DOMAIN>
+./scripts/smoke-test.sh https://<PUBLIC_IP>
 ```
 
 回滚 App：

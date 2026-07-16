@@ -21,7 +21,38 @@ $target = Join-Path $InstallDir "nodewatch-agent.exe"
 $existingTask = Get-ScheduledTask -TaskName "NodeWatch Agent" -ErrorAction SilentlyContinue
 if ($existingTask) {
     Stop-ScheduledTask -TaskName "NodeWatch Agent" -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName "NodeWatch Agent" -Confirm:$false
 }
+
+$targetFullPath = [System.IO.Path]::GetFullPath($target)
+$runningAgents = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.ExecutablePath -and [string]::Equals(
+        [System.IO.Path]::GetFullPath($_.ExecutablePath),
+        $targetFullPath,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )
+})
+foreach ($process in $runningAgents) {
+    Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    $runningAgents = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ExecutablePath -and [string]::Equals(
+            [System.IO.Path]::GetFullPath($_.ExecutablePath),
+            $targetFullPath,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    })
+    if ($runningAgents.Count -eq 0) {
+        break
+    }
+    Start-Sleep -Milliseconds 250
+}
+if ($runningAgents.Count -gt 0) {
+    throw "旧 Agent 进程未能停止，请重启电脑后重新运行安装脚本"
+}
+
 Copy-Item -LiteralPath $BinaryPath -Destination $target -Force
 $config = @"
 server_url = "$ServerUrl"
