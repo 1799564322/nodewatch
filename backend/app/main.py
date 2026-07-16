@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app import __version__
 from app.api.v1.auth import router as auth_router
 from app.api.v1.agent import router as agent_router
 from app.api.v1.alerts import router as alerts_router
@@ -32,7 +33,7 @@ async def lifespan(_: FastAPI):
     if scheduler:
         scheduler.shutdown(wait=False)
 
-app = FastAPI(title="NodeWatch API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="NodeWatch API", version=__version__, lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
     TrustedHostMiddleware,

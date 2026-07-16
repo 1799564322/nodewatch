@@ -6,6 +6,7 @@ import signal
 import threading
 import time
 
+from nodewatch_agent import __version__
 from nodewatch_agent.cache import MetricCache
 from nodewatch_agent.client import AgentClient, AgentRequestError
 from nodewatch_agent.collector import MetricsCollector, collect_system_info
@@ -133,6 +134,7 @@ def run(config_path: Path, once: bool = False) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="NodeWatch Agent")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--config", type=Path, default=Path("config.toml"))
     parser.add_argument("--once", action="store_true", help="完成一次采集和上报尝试后退出")
     args = parser.parse_args()

@@ -8,6 +8,7 @@ os.environ.setdefault("BOOTSTRAP_ADMIN_USERNAME", "admin")
 os.environ.setdefault("BOOTSTRAP_ADMIN_PASSWORD", "correct-horse-battery-staple")
 os.environ.setdefault("SESSION_COOKIE_SECURE", "false")
 os.environ.setdefault("ALLOWED_HOSTS", "testserver,localhost,127.0.0.1")
+os.environ.setdefault("RUN_SCHEDULER", "false")
 
 import pytest
 from fastapi.testclient import TestClient

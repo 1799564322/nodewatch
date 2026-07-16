@@ -1,0 +1,36 @@
+flowchart LR
+    subgraph Client[用户侧]
+        Browser[浏览器]
+    end
+
+    subgraph Nodes[被监控设备]
+        Agent[Windows / Linux Agent]
+        Queue[(SQLite WAL 待传队列)]
+        Agent -->|先落盘| Queue
+    end
+
+    subgraph Server[2 核 2 GiB 单机服务器]
+        Nginx[Nginx\nHTTPS 与反向代理]
+        App[FastAPI + Vue 静态资源\n单副本 / 单 Worker]
+        Scheduler[APScheduler\n离线检查与数据清理]
+        Database[(PostgreSQL 17\n历史 / latest / 告警)]
+        Backup[pg_dump 压缩备份\n恢复演练]
+
+        Nginx --> App
+        App --> Database
+        Scheduler --> Database
+        Database --> Backup
+    end
+
+    subgraph Delivery[交付链路]
+        Repo[GitHub Repository]
+        CI[GitHub Actions\n测试与构建]
+        Registry[GHCR\n固定版本镜像]
+        Compose[Docker Compose]
+        Repo --> CI --> Registry --> Compose
+    end
+
+    Browser -->|HTTPS| Nginx
+    Queue -->|HTTPS 幂等批量补传| Nginx
+    Compose --> App
+    Compose --> Database

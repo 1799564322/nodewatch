@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nodewatch-agent"
-version = "0.1.0"
+version = "1.0.0"
 description = "NodeWatch 跨平台主机采集 Agent"
 requires-python = ">=3.12"
 dependencies = ["httpx>=0.28,<1.0", "psutil>=6.1,<8.0"]

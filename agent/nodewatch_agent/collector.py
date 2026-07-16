@@ -6,6 +6,8 @@ import uuid
 
 import psutil
 
+from nodewatch_agent import __version__
+
 
 def collect_system_info() -> dict[str, object]:
     return {
@@ -17,7 +19,7 @@ def collect_system_info() -> dict[str, object]:
         "cpu_physical_cores": psutil.cpu_count(logical=False),
         "cpu_logical_cores": psutil.cpu_count(logical=True),
         "memory_total_bytes": psutil.virtual_memory().total,
-        "agent_version": "0.1.0",
+        "agent_version": __version__,
     }
 
 
