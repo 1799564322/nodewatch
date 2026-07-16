@@ -77,3 +77,16 @@ jobs:
             org.opencontainers.image.version=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: 同步官方 PostgreSQL 镜像到 GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Postgres.Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.name }}-postgres:17-alpine-${{ github.ref_name }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=17-alpine-${{ github.ref_name }}
+          cache-from: type=gha,scope=postgres
+          cache-to: type=gha,mode=max,scope=postgres

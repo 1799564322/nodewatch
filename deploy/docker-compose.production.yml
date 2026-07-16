@@ -2,7 +2,7 @@ name: nodewatch
 
 services:
   db:
-    image: postgres:17-alpine
+    image: ${POSTGRES_IMAGE:?请设置固定版本 POSTGRES_IMAGE}
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?请设置 POSTGRES_USER}

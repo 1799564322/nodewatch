@@ -164,12 +164,13 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 分别写入 `SECRET_KEY` 和 `POSTGRES_PASSWORD`。首次通过 IP 验证时设置：
 
 ```dotenv
-NODEWATCH_IMAGE=ghcr.io/<GITHUB_USERNAME>/nodewatch:v0.1.0
+NODEWATCH_IMAGE=ghcr.io/<GITHUB_USERNAME>/nodewatch:v0.1.1
+POSTGRES_IMAGE=ghcr.io/<GITHUB_USERNAME>/nodewatch-postgres:17-alpine-v0.1.1
 ALLOWED_HOSTS=<PUBLIC_IP>
 SESSION_COOKIE_SECURE=false
 ```
 
-不要提交服务器 `.env`。
+不要提交服务器 `.env`。发布工作流会把官方 `postgres:17-alpine` 同步为与发布标签绑定的 GHCR 镜像，避免中国内地服务器因 Docker Hub 超时无法部署；不要改用来源不明的镜像站。
 
 ## 7. 启动生产 Compose
 

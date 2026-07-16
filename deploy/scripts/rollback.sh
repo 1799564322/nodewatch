@@ -8,6 +8,6 @@ fi
 cd "$(dirname "$0")/.."
 sed -i "s|^NODEWATCH_IMAGE=.*|NODEWATCH_IMAGE=$1|" .env
 docker compose pull app
-docker compose up -d app
+docker compose up -d --wait --wait-timeout 180 app
 docker compose ps
 "$(dirname "$0")/smoke-test.sh" http://127.0.0.1:8000

@@ -14,6 +14,6 @@ fi
 
 docker compose config --quiet
 docker compose pull
-docker compose up -d
+docker compose up -d --wait --wait-timeout 180
 docker compose ps
 "$(dirname "$0")/smoke-test.sh" http://127.0.0.1:8000
